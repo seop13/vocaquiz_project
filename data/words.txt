@@ -1,0 +1,10 @@
+apple,사과
+book,책
+friend,친구
+weather,날씨
+important,중요한
+epoch,에포크
+overfitting,과적합
+dataset,데이터셋
+algorithm,알고리즘
+neural network,신경망
