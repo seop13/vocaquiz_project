@@ -15,12 +15,14 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 WORDS_PATH = os.path.join(DATA_DIR, 'words.txt')
+WRONG_PATH = os.path.join(DATA_DIR, 'wrong.txt')      # 오답노트
+RECORD_PATH = os.path.join(DATA_DIR, 'records.txt')   # 학습 기록
 
 
-def load_words(path=WORDS_PATH):
+def load_words(path=WORDS_PATH, notify=True):
     """단어장 파일을 읽어 딕셔너리로 돌려준다.
 
-    파일이 없으면 빈 딕셔너리를 돌려주고,
+    파일이 없으면 빈 딕셔너리를 돌려주고(notify=False면 알림 없이),
     형식이 잘못된 줄은 건너뛴다.
     """
     words = {}
@@ -37,7 +39,8 @@ def load_words(path=WORDS_PATH):
                     continue
                 words[eng.strip()] = kor.strip()
     except FileNotFoundError:
-        print(f'[알림] 단어장 파일이 없어 새로 시작합니다: {path}')
+        if notify:
+            print(f'[알림] 단어장 파일이 없어 새로 시작합니다: {path}')
     return words
 
 
@@ -47,6 +50,33 @@ def save_words(words, path=WORDS_PATH):
     with open(path, 'w', encoding='utf-8') as f:
         for eng, kor in words.items():
             f.write(f'{eng},{kor}\n')
+
+
+def append_record(date, mode, correct, total, path=RECORD_PATH):
+    """퀴즈 결과 한 줄을 학습 기록 파일 끝에 추가한다. ('a' 모드)"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write(f'{date},{mode},{correct},{total}\n')
+
+
+def load_records(path=RECORD_PATH):
+    """학습 기록을 [(날짜, 모드, 맞은 수, 전체 수), ...]로 돌려준다."""
+    records = []
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split(',')
+                if len(parts) != 4:
+                    continue
+                try:
+                    date, mode = parts[0], parts[1]
+                    correct, total = int(parts[2]), int(parts[3])
+                except ValueError:
+                    continue
+                records.append((date, mode, correct, total))
+    except FileNotFoundError:
+        pass  # 아직 기록이 없으면 빈 리스트
+    return records
 
 
 if __name__ == '__main__':
