@@ -1,9 +1,10 @@
-"""VocaQuiz 콘솔 버전 (v1.0).
+"""VocaQuiz 실행 파일.
 
-vocaquiz 패키지의 모듈들을 연결해 메뉴로 실행한다.
-    python main.py
+    python main.py            → GUI 버전 (Tkinter, v2.0)
+    python main.py --console  → 콘솔 버전 (v1.0)
 """
 
+import sys
 import time
 
 from vocaquiz import file_io, quiz, validator, word_manager
@@ -203,7 +204,11 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except (KeyboardInterrupt, EOFError):
-        print('\n프로그램을 종료합니다.')
+    if '--console' in sys.argv:
+        try:
+            main()
+        except (KeyboardInterrupt, EOFError):
+            print('\n프로그램을 종료합니다.')
+    else:
+        from vocaquiz import gui
+        gui.run()
