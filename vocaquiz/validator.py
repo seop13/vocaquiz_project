@@ -19,6 +19,9 @@ HANGUL_PATTERN = re.compile(r'[가-힣]')
 # 문제 수: 1 ~ 99 (0으로 시작하면 안 됨)
 COUNT_PATTERN = re.compile(r'^[1-9][0-9]?$')
 
+# 단어장 이름: 한글·영어·숫자·공백·_·- 로 1~20자 (파일 이름으로 쓰이므로)
+CATEGORY_PATTERN = re.compile(r'^[가-힣a-zA-Z0-9 _\-]{1,20}$')
+
 
 def is_valid_english(eng):
     """영어 단어 형식이 맞으면 True를 돌려준다."""
@@ -36,6 +39,11 @@ def is_valid_meaning(kor):
 def is_valid_count(text):
     """문제 수 입력이 1~99 사이 숫자면 True를 돌려준다."""
     return COUNT_PATTERN.match(text.strip()) is not None
+
+
+def is_valid_category(name):
+    """단어장 이름이 1~20자의 한글·영어·숫자 등으로 되어 있으면 True."""
+    return CATEGORY_PATTERN.match(name.strip()) is not None
 
 
 def check_word_input(eng, kor):
@@ -65,6 +73,10 @@ if __name__ == '__main__':
     print('--- 문제 수 ---')
     for count in ['10', '5', '0', '100', 'ten', '07']:
         print(f'{count!r:18} {is_valid_count(count)}')
+
+    print('--- 단어장 이름 ---')
+    for name in ['과일', 'AI 용어', 'week_1', '과일/채소', '']:
+        print(f'{name!r:18} {is_valid_category(name)}')
 
     print('--- 단어 추가 검사 ---')
     print(check_word_input('apple', '사과'))

@@ -1,8 +1,8 @@
 """VocaQuiz GUI 버전 (Tkinter).
 
 탭 3개로 구성한다.
-    [단어장]   단어 목록 보기, 추가·삭제·검색
-    [퀴즈]     일반 퀴즈 / 오답노트 퀴즈
+    [단어장]   단어장(카테고리) 선택·만들기·삭제, 단어 추가·삭제·검색
+    [퀴즈]     단어장별 / 전체 퀴즈, 오답노트 퀴즈
     [학습 기록] 날짜별 점수
 
 실행은 프로젝트 폴더에서  python main.py
@@ -10,12 +10,13 @@
 
 import time
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from vocaquiz import file_io, quiz, validator, word_manager
 
 FONT = '맑은 고딕'
 MODE_NAMES = {quiz.EN_TO_KO: '영어→뜻', quiz.KO_TO_EN: '뜻→영어'}
+ALL_CATEGORY = '전체'
 
 
 class VocaApp(tk.Tk):
@@ -28,7 +29,10 @@ class VocaApp(tk.Tk):
         self.minsize(600, 500)
         self.option_add('*Font', (FONT, 11))
 
-        self.words = file_io.load_words()
+        file_io.prepare_wordbooks()
+        self.category = file_io.list_categories()[0]   # 지금 보고 있는 단어장
+        self.words = file_io.load_category(self.category)
+        self.quiz_title = ''     # 기록에 남길 퀴즈 이름 (예: 과일)
 
         # 퀴즈 진행 상태
         self.items = []          # 출제된 문제 [(영어, 뜻), ...]
@@ -51,6 +55,7 @@ class VocaApp(tk.Tk):
         self._build_quiz_tab()
         self._build_record_tab()
 
+        self.refresh_categories()
         self.refresh_word_list()
         self.refresh_records()
 
@@ -60,8 +65,21 @@ class VocaApp(tk.Tk):
         """단어 목록(표)과 입력칸, 버튼을 만든다."""
         tab = self.word_tab
 
-        self.count_label = ttk.Label(tab, text='')
-        self.count_label.pack(anchor='w')
+        top = ttk.Frame(tab)
+        top.pack(fill='x')
+        ttk.Label(top, text='단어장').pack(side='left')
+        self.category_var = tk.StringVar(value=self.category)
+        self.category_box = ttk.Combobox(top, textvariable=self.category_var,
+                                         state='readonly', width=16)
+        self.category_box.pack(side='left', padx=6)
+        self.category_box.bind('<<ComboboxSelected>>',
+                               lambda event: self.change_category())
+        ttk.Button(top, text='새 단어장',
+                   command=self.new_category).pack(side='left')
+        ttk.Button(top, text='단어장 삭제',
+                   command=self.remove_category).pack(side='left', padx=6)
+        self.count_label = ttk.Label(top, text='')
+        self.count_label.pack(side='right')
 
         table_frame = ttk.Frame(tab)
         table_frame.pack(fill='both', expand=True, pady=(4, 10))
@@ -100,6 +118,57 @@ class VocaApp(tk.Tk):
         ttk.Button(buttons, text='입력칸 비우기',
                    command=self.clear_entries).pack(side='right')
 
+    def refresh_categories(self):
+        """단어장 목록을 단어장 탭과 퀴즈 탭의 선택 상자에 다시 채운다."""
+        names = file_io.list_categories()
+        self.category_box['values'] = names
+        self.category_var.set(self.category)
+        self.scope_box['values'] = [ALL_CATEGORY] + names
+        if self.scope_var.get() not in self.scope_box['values']:
+            self.scope_var.set(self.category)
+
+    def change_category(self):
+        """선택 상자에서 고른 단어장을 불러온다."""
+        self.category = self.category_var.get()
+        self.words = file_io.load_category(self.category)
+        self.scope_var.set(self.category)
+        self.clear_entries()
+        self.refresh_word_list()
+
+    def new_category(self):
+        """새 단어장 이름을 입력받아 만든다."""
+        name = simpledialog.askstring('새 단어장', '단어장 이름 (예: 과일, 동물)',
+                                      parent=self)
+        if name is None:
+            return
+        name = name.strip()
+        if name == ALL_CATEGORY or not validator.is_valid_category(name):
+            messagebox.showwarning('입력 확인',
+                                   '단어장 이름은 한글·영어·숫자로 1~20자까지 가능합니다.')
+            return
+        if not file_io.create_category(name):
+            messagebox.showinfo('알림', '이미 있는 단어장입니다.')
+            return
+        self.category = name
+        self.words = {}
+        self.refresh_categories()
+        self.scope_var.set(name)
+        self.refresh_word_list()
+
+    def remove_category(self):
+        """지금 보고 있는 단어장을 삭제한다."""
+        message = (f"'{self.category}' 단어장과 단어 {len(self.words)}개를 "
+                   '삭제할까요?')
+        if not messagebox.askyesno('단어장 삭제', message):
+            return
+        file_io.delete_category(self.category)
+        file_io.prepare_wordbooks()  # 하나도 없으면 '기본'을 다시 만든다
+        self.category = file_io.list_categories()[0]
+        self.words = file_io.load_category(self.category)
+        self.refresh_categories()
+        self.scope_var.set(self.category)
+        self.refresh_word_list()
+
     def refresh_word_list(self):
         """표의 내용을 현재 단어장으로 다시 채운다."""
         self.tree.delete(*self.tree.get_children())
@@ -133,10 +202,11 @@ class VocaApp(tk.Tk):
         if not word_manager.add_word(self.words, eng, kor):
             messagebox.showinfo('알림', '이미 있는 단어입니다.')
             return
-        file_io.save_words(self.words)
+        file_io.save_category(self.category, self.words)
         self.refresh_word_list()
         self.clear_entries()
-        messagebox.showinfo('완료', f"'{eng.strip()}' 단어를 추가했습니다.")
+        messagebox.showinfo('완료',
+                            f"'{eng.strip()}' 단어를 [{self.category}]에 추가했습니다.")
 
     def delete_word(self):
         """입력칸(또는 표에서 선택한) 단어를 삭제하고 저장한다."""
@@ -147,7 +217,7 @@ class VocaApp(tk.Tk):
         if not messagebox.askyesno('삭제 확인', f"'{eng}' 단어를 삭제할까요?"):
             return
         if word_manager.delete_word(self.words, eng):
-            file_io.save_words(self.words)
+            file_io.save_category(self.category, self.words)
             self.refresh_word_list()
             self.clear_entries()
         else:
@@ -175,24 +245,31 @@ class VocaApp(tk.Tk):
 
         setting = ttk.LabelFrame(tab, text='퀴즈 설정', padding=10)
         setting.pack(fill='x')
+        ttk.Label(setting, text='출제 단어장').grid(row=0, column=0, sticky='w')
+        self.scope_var = tk.StringVar(value=self.category)
+        self.scope_box = ttk.Combobox(setting, textvariable=self.scope_var,
+                                      state='readonly', width=16)
+        self.scope_box.grid(row=0, column=1, columnspan=3, sticky='w',
+                            pady=(0, 8))
+
         self.mode_var = tk.StringVar(value=quiz.EN_TO_KO)
         ttk.Radiobutton(setting, text='영어 → 뜻', value=quiz.EN_TO_KO,
-                        variable=self.mode_var).grid(row=0, column=0)
+                        variable=self.mode_var).grid(row=1, column=0)
         ttk.Radiobutton(setting, text='뜻 → 영어', value=quiz.KO_TO_EN,
-                        variable=self.mode_var).grid(row=0, column=1,
+                        variable=self.mode_var).grid(row=1, column=1,
                                                      padx=10)
-        ttk.Label(setting, text='문제 수').grid(row=0, column=2, padx=(20, 4))
+        ttk.Label(setting, text='문제 수').grid(row=1, column=2, padx=(20, 4))
         self.count_var = tk.StringVar(value='10')
         ttk.Spinbox(setting, from_=1, to=99, width=5,
-                    textvariable=self.count_var).grid(row=0, column=3)
+                    textvariable=self.count_var).grid(row=1, column=3)
 
         self.start_button = ttk.Button(setting, text='퀴즈 시작',
                                        command=self.start_quiz)
-        self.start_button.grid(row=1, column=0, columnspan=2, sticky='we',
+        self.start_button.grid(row=2, column=0, columnspan=2, sticky='we',
                                pady=(10, 0))
         self.wrong_button = ttk.Button(setting, text='오답노트 풀기',
                                        command=self.start_wrong_quiz)
-        self.wrong_button.grid(row=1, column=2, columnspan=2, sticky='we',
+        self.wrong_button.grid(row=2, column=2, columnspan=2, sticky='we',
                                pady=(10, 0), padx=(20, 0))
 
         self.progress_label = ttk.Label(tab, text='퀴즈를 시작하세요',
@@ -219,11 +296,17 @@ class VocaApp(tk.Tk):
         self.score_label.pack(pady=(6, 0))
 
     def start_quiz(self):
-        """일반 퀴즈를 시작한다."""
+        """고른 단어장(또는 전체)으로 퀴즈를 시작한다."""
         if not validator.is_valid_count(self.count_var.get()):
             messagebox.showwarning('입력 확인', '문제 수는 1~99 사이 숫자로 입력하세요.')
             return
-        self._begin(self.words, int(self.count_var.get()), is_wrong=False)
+        scope = self.scope_var.get()
+        if scope == ALL_CATEGORY:
+            words = file_io.load_all_categories()
+        else:
+            words = file_io.load_category(scope)
+        self.quiz_title = scope
+        self._begin(words, int(self.count_var.get()), is_wrong=False)
 
     def start_wrong_quiz(self):
         """오답노트의 단어를 모두 출제한다."""
@@ -231,6 +314,7 @@ class VocaApp(tk.Tk):
         if not wrong:
             messagebox.showinfo('오답노트', '오답노트가 비어 있습니다. 👍')
             return
+        self.quiz_title = '오답노트'
         self._begin(wrong, len(wrong), is_wrong=True)
 
     def _begin(self, words, n, is_wrong):
@@ -255,7 +339,7 @@ class VocaApp(tk.Tk):
     def show_question(self):
         """현재 문제를 화면에 보여준다."""
         item = self.items[self.index]
-        kind = '오답노트' if self.is_wrong_quiz else MODE_NAMES[self.mode]
+        kind = f'{self.quiz_title} · {MODE_NAMES[self.mode]}'
         self.progress_label.config(
             text=f'{kind}  Q. {self.index + 1} / {len(self.items)}')
         self.question_label.config(text=quiz.get_question(item, self.mode))
@@ -292,7 +376,8 @@ class VocaApp(tk.Tk):
         """점수를 기록하고 오답노트를 갱신한다."""
         correct, total = quiz.get_score(self.results)
         date = time.strftime('%Y-%m-%d %H:%M')
-        file_io.append_record(date, MODE_NAMES[self.mode], correct, total)
+        kind = f'{self.quiz_title} · {MODE_NAMES[self.mode]}'
+        file_io.append_record(date, kind, correct, total)
 
         new_wrong = quiz.get_wrong_words(self.results)
         if self.is_wrong_quiz:
@@ -336,10 +421,10 @@ class VocaApp(tk.Tk):
         if not records:
             self.record_list.insert('end', '아직 학습 기록이 없습니다.')
             return
-        for date, mode, correct, total in reversed(records):
+        for date, kind, correct, total in reversed(records):
             rate = correct / total * 100 if total else 0
             self.record_list.insert(
-                'end', f'{date}   {mode}   {correct:>2}/{total:<2}  '
+                'end', f'{date}   {kind}   {correct:>2}/{total:<2}  '
                        f'({rate:.0f}%)')
 
 
