@@ -604,5 +604,11 @@ class VocaApp(tk.Tk):
 
 def run():
     """GUI 프로그램을 실행한다."""
+    try:
+        # 윈도우 화면 배율(125%, 150% 등)에서 글씨가 흐려지지 않게 한다
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except (ImportError, AttributeError, OSError):
+        pass  # 윈도우가 아니거나 지원하지 않으면 그냥 넘어간다
     app = VocaApp()
     app.mainloop()
