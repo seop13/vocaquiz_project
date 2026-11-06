@@ -38,8 +38,14 @@ class VocaApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('VocaQuiz - 영어 단어장 퀴즈')
-        self.geometry('780x660')
-        self.minsize(720, 620)
+        # 화면 배율(100%, 125%, 150% …)에 맞춰 창 크기를 키운다.
+        # 글씨는 배율에 맞춰 커지지만 픽셀로 정한 크기는 그대로라서,
+        # 직접 곱해 주지 않으면 창이 작아져 아래쪽이 잘린다.
+        self.scale = max(1.0, self.winfo_fpixels('1i') / 96)
+        width = min(self.px(780), self.winfo_screenwidth() - 40)
+        height = min(self.px(660), self.winfo_screenheight() - 80)
+        self.geometry(f'{width}x{height}')
+        self.minsize(min(self.px(720), width), min(self.px(600), height))
         self.configure(bg=CREAM)
         self.option_add('*Font', (FONT, 11))
         self._setup_style()
@@ -76,6 +82,10 @@ class VocaApp(tk.Tk):
         self.refresh_records()
 
     # ================= 디자인 =================
+
+    def px(self, size):
+        """100% 배율 기준 픽셀 크기를 현재 화면 배율에 맞게 바꾼다."""
+        return int(size * self.scale)
 
     def _setup_style(self):
         """ttk 위젯들의 색과 글꼴을 한 곳에서 정한다."""
@@ -124,7 +134,7 @@ class VocaApp(tk.Tk):
         style.configure('TSpinbox', padding=4, fieldbackground=WHITE)
 
         # 표
-        style.configure('Treeview', rowheight=30, background=WHITE,
+        style.configure('Treeview', rowheight=self.px(30), background=WHITE,
                         fieldbackground=WHITE, borderwidth=0,
                         font=(FONT, 11))
         style.configure('Treeview.Heading', background=NAVY,
@@ -140,7 +150,7 @@ class VocaApp(tk.Tk):
 
     def _build_header(self):
         """창 맨 위의 남색 제목 띠를 만든다."""
-        header = tk.Frame(self, bg=NAVY, height=64)
+        header = tk.Frame(self, bg=NAVY, height=self.px(64))
         header.pack(fill='x')
         tk.Label(header, text='VocaQuiz', bg=NAVY, fg=WHITE,
                  font=(FONT, 20, 'bold')).pack(side='left', padx=(20, 8),
@@ -407,7 +417,7 @@ class VocaApp(tk.Tk):
         self.progress_label = ttk.Label(board, text='퀴즈를 시작하세요',
                                         style='CardSub.TLabel')
         self.progress_label.pack()
-        self.progress = ttk.Progressbar(board, length=420, maximum=1,
+        self.progress = ttk.Progressbar(board, length=self.px(420), maximum=1,
                                         style='Quiz.Horizontal.TProgressbar')
         self.progress.pack(pady=(8, 0))
 
