@@ -13,23 +13,12 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 from vocaquiz import file_io, quiz, validator, word_manager
+from vocaquiz.theme import (BLUE, CREAM, FONT, GRAY, LINE, NAVY, ORANGE,
+                            ORANGE_DARK, RED, STRIPE, WHITE)
+from vocaquiz.widgets import RoundedButton, RoundedCard
 
-FONT = '맑은 고딕'
 MODE_NAMES = {quiz.EN_TO_KO: '영어→뜻', quiz.KO_TO_EN: '뜻→영어'}
 ALL_CATEGORY = '전체'
-
-# 색상 (발표 PPT와 같은 색 조합)
-NAVY = '#1F2A44'        # 진한 남색: 제목, 머리글
-CREAM = '#F7F5EF'       # 연한 크림색: 창 배경
-WHITE = '#FFFFFF'       # 카드 배경
-STRIPE = '#F3F0E8'      # 표 줄무늬
-LINE = '#E2DED3'        # 테두리
-GRAY = '#6A7179'        # 보조 글씨
-BLUE = '#2F5FBF'        # 주요 버튼, 정답
-BLUE_DARK = '#244C99'
-ORANGE = '#F2A65A'      # 강조
-ORANGE_DARK = '#B85A16'
-RED = '#C0392B'         # 오답, 삭제
 
 
 class VocaApp(tk.Tk):
@@ -80,6 +69,7 @@ class VocaApp(tk.Tk):
         self.refresh_categories()
         self.refresh_word_list()
         self.refresh_records()
+        self.go_start()
 
     # ================= 디자인 =================
 
@@ -115,17 +105,6 @@ class VocaApp(tk.Tk):
         style.map('TNotebook.Tab',
                   background=[('selected', WHITE)],
                   foreground=[('selected', NAVY)])
-
-        # 버튼: 기본 / 강조(파랑) / 위험(빨강)
-        style.configure('TButton', padding=(14, 6), background=WHITE,
-                        foreground=NAVY, borderwidth=1, focusthickness=0)
-        style.map('TButton', background=[('active', STRIPE)])
-        style.configure('Accent.TButton', background=BLUE, foreground=WHITE,
-                        bordercolor=BLUE, font=(FONT, 11, 'bold'))
-        style.map('Accent.TButton',
-                  background=[('disabled', LINE), ('active', BLUE_DARK)],
-                  foreground=[('disabled', GRAY)])
-        style.configure('Danger.TButton', foreground=RED)
 
         # 입력칸
         style.configure('TEntry', padding=6, fieldbackground=WHITE)
@@ -170,10 +149,17 @@ class VocaApp(tk.Tk):
             text=f'단어장 {len(categories)}개  ·  단어 {total}개  ·  '
                  f'오답 {wrong}개')
 
-    @staticmethod
-    def _card(parent, padding=16):
-        """흰색 카드 모양의 틀을 만든다."""
-        return ttk.Frame(parent, style='Card.TFrame', padding=padding)
+    def _card(self, parent, padding=16):
+        """모서리가 둥근 흰색 카드를 만든다. 내용은 card.inner 에 넣는다."""
+        return RoundedCard(parent, radius=self.px(16),
+                           padding=self.px(padding), outer=CREAM,
+                           border=LINE)
+
+    def _button(self, parent, text, command, kind='default', outer=WHITE):
+        """모서리가 둥근 버튼을 만든다."""
+        return RoundedButton(parent, text, command, kind=kind, outer=outer,
+                             radius=self.px(10), padx=self.px(16),
+                             pady=self.px(7))
 
     # ================= 단어장 탭 =================
 
@@ -191,19 +177,21 @@ class VocaApp(tk.Tk):
         self.category_box.pack(side='left', padx=8)
         self.category_box.bind('<<ComboboxSelected>>',
                                lambda event: self.change_category())
-        ttk.Button(top, text='+ 새 단어장',
-                   command=self.new_category).pack(side='left')
-        ttk.Button(top, text='단어장 삭제', style='Danger.TButton',
-                   command=self.remove_category).pack(side='left', padx=6)
+        self._button(top, '+ 새 단어장', self.new_category,
+                     outer=CREAM).pack(side='left')
+        self._button(top, '단어장 삭제', self.remove_category, kind='danger',
+                     outer=CREAM).pack(side='left', padx=6)
         self.count_label = ttk.Label(top, text='', style='Sub.TLabel')
         self.count_label.pack(side='right')
 
         # 입력 카드를 먼저 아래쪽에 고정해서, 창이 작아도 항상 보이게 한다
-        form = self._card(tab, padding=14)
-        form.pack(side='bottom', fill='x', pady=(12, 0))
+        form_card = self._card(tab, padding=14)
+        form_card.pack(side='bottom', fill='x', pady=(12, 0))
+        form = form_card.inner
 
-        table_frame = ttk.Frame(tab)
-        table_frame.pack(fill='both', expand=True)
+        table_card = self._card(tab, padding=8)
+        table_card.pack(fill='both', expand=True)
+        table_frame = table_card.inner
         self.tree = ttk.Treeview(table_frame, columns=('eng', 'kor'),
                                  show='headings', height=6)
         self.tree.heading('eng', text='영어', anchor='w')
@@ -233,14 +221,14 @@ class VocaApp(tk.Tk):
 
         buttons = ttk.Frame(form, style='Card.TFrame')
         buttons.grid(row=2, column=0, columnspan=2, sticky='we')
-        ttk.Button(buttons, text='추가', style='Accent.TButton',
-                   command=self.add_word).pack(side='left')
-        ttk.Button(buttons, text='검색',
-                   command=self.search_word).pack(side='left', padx=6)
-        ttk.Button(buttons, text='삭제', style='Danger.TButton',
-                   command=self.delete_word).pack(side='left')
-        ttk.Button(buttons, text='입력칸 비우기',
-                   command=self.clear_entries).pack(side='right')
+        self._button(buttons, '추가', self.add_word,
+                     kind='primary').pack(side='left')
+        self._button(buttons, '검색', self.search_word).pack(side='left',
+                                                           padx=6)
+        self._button(buttons, '삭제', self.delete_word,
+                     kind='danger').pack(side='left')
+        self._button(buttons, '입력칸 비우기',
+                     self.clear_entries).pack(side='right')
 
     def refresh_categories(self):
         """단어장 목록을 단어장 탭과 퀴즈 탭의 선택 상자에 다시 채운다."""
@@ -366,83 +354,131 @@ class VocaApp(tk.Tk):
         self.tree.see(eng)
 
     # ================= 퀴즈 탭 =================
+    # 퀴즈 탭은 카드 하나 안에서 화면 3개를 바꿔 가며 보여준다.
+    #   시작 화면 → (퀴즈 시작) → 문제 화면 → (마지막 문제) → 결과 화면
 
     def _build_quiz_tab(self):
-        """퀴즈 설정 카드와 문제 카드를 만든다."""
-        tab = self.quiz_tab
+        """퀴즈 카드와 그 안의 시작·문제·결과 화면을 만든다."""
+        board_card = self._card(self.quiz_tab, padding=20)
+        board_card.pack(fill='both', expand=True)
+        board = board_card.inner
 
-        setting = self._card(tab, padding=14)
-        setting.pack(fill='x')
-        ttk.Label(setting, text='출제 단어장', style='CardSub.TLabel').grid(
-            row=0, column=0, sticky='w')
-        ttk.Label(setting, text='모드', style='CardSub.TLabel').grid(
-            row=0, column=1, sticky='w', padx=(16, 0))
-        ttk.Label(setting, text='문제 수', style='CardSub.TLabel').grid(
-            row=0, column=3, sticky='w', padx=(16, 0))
+        self.start_view = ttk.Frame(board, style='Card.TFrame')
+        self.play_view = ttk.Frame(board, style='Card.TFrame')
+        self.result_view = ttk.Frame(board, style='Card.TFrame')
+        self._build_start_view(self.start_view)
+        self._build_play_view(self.play_view)
+        self._build_result_view(self.result_view)
+        self.show_view(self.start_view)
 
+    def show_view(self, view):
+        """퀴즈 카드 안에서 view 화면 하나만 보이게 한다."""
+        for frame in (self.start_view, self.play_view, self.result_view):
+            frame.pack_forget()
+        view.pack(expand=True)
+
+    def _build_start_view(self, view):
+        """시작 화면: 퀴즈 설정과 시작 버튼."""
+        tk.Label(view, text='퀴즈 설정', bg=WHITE, fg=NAVY,
+                 font=(FONT, 20, 'bold')).pack()
+        ttk.Label(view, text='단어장과 모드를 고르고 퀴즈를 시작하세요',
+                  style='CardSub.TLabel').pack(pady=(4, 20))
+
+        form = ttk.Frame(view, style='Card.TFrame')
+        form.pack()
+        ttk.Label(form, text='출제 단어장', style='CardSub.TLabel').grid(
+            row=0, column=0, sticky='e', padx=(0, 12), pady=6)
         self.scope_var = tk.StringVar(value=self.category)
-        self.scope_box = ttk.Combobox(setting, textvariable=self.scope_var,
-                                      state='readonly', width=12,
+        self.scope_box = ttk.Combobox(form, textvariable=self.scope_var,
+                                      state='readonly', width=16,
                                       font=(FONT, 11))
-        self.scope_box.grid(row=1, column=0, sticky='w', pady=(4, 0))
+        self.scope_box.grid(row=0, column=1, columnspan=2, sticky='w')
 
+        ttk.Label(form, text='모드', style='CardSub.TLabel').grid(
+            row=1, column=0, sticky='e', padx=(0, 12), pady=6)
         self.mode_var = tk.StringVar(value=quiz.EN_TO_KO)
-        ttk.Radiobutton(setting, text='영어 → 뜻', value=quiz.EN_TO_KO,
+        ttk.Radiobutton(form, text='영어 → 뜻', value=quiz.EN_TO_KO,
                         variable=self.mode_var,
-                        style='Card.TRadiobutton').grid(
-            row=1, column=1, padx=(16, 0), pady=(4, 0))
-        ttk.Radiobutton(setting, text='뜻 → 영어', value=quiz.KO_TO_EN,
+                        style='Card.TRadiobutton').grid(row=1, column=1,
+                                                        sticky='w')
+        ttk.Radiobutton(form, text='뜻 → 영어', value=quiz.KO_TO_EN,
                         variable=self.mode_var,
-                        style='Card.TRadiobutton').grid(
-            row=1, column=2, padx=(8, 0), pady=(4, 0))
+                        style='Card.TRadiobutton').grid(row=1, column=2,
+                                                        sticky='w',
+                                                        padx=(12, 0))
+
+        ttk.Label(form, text='문제 수', style='CardSub.TLabel').grid(
+            row=2, column=0, sticky='e', padx=(0, 12), pady=6)
         self.count_var = tk.StringVar(value='10')
-        ttk.Spinbox(setting, from_=1, to=99, width=4, font=(FONT, 11),
-                    textvariable=self.count_var).grid(
-            row=1, column=3, sticky='w', padx=(16, 0), pady=(4, 0))
+        ttk.Spinbox(form, from_=1, to=99, width=5, font=(FONT, 11),
+                    textvariable=self.count_var).grid(row=2, column=1,
+                                                      sticky='w')
 
-        buttons = ttk.Frame(setting, style='Card.TFrame')
-        buttons.grid(row=0, column=4, rowspan=2, sticky='e', padx=(16, 0))
-        setting.columnconfigure(4, weight=1)
-        self.start_button = ttk.Button(buttons, text='퀴즈 시작',
-                                       style='Accent.TButton',
-                                       command=self.start_quiz)
-        self.start_button.pack(fill='x')
-        self.wrong_button = ttk.Button(buttons, text='오답노트 풀기',
-                                       command=self.start_wrong_quiz)
-        self.wrong_button.pack(fill='x', pady=(6, 0))
+        buttons = ttk.Frame(view, style='Card.TFrame')
+        buttons.pack(pady=(26, 0))
+        self._button(buttons, '퀴즈 시작', self.start_quiz,
+                     kind='primary').pack(side='left')
+        self._button(buttons, '오답노트 풀기',
+                     self.start_wrong_quiz).pack(side='left', padx=(10, 0))
+        self.wrong_count_label = ttk.Label(view, text='',
+                                           style='CardSub.TLabel')
+        self.wrong_count_label.pack(pady=(10, 0))
 
-        board = self._card(tab, padding=18)
-        board.pack(fill='both', expand=True, pady=(14, 0))
-
-        self.progress_label = ttk.Label(board, text='퀴즈를 시작하세요',
-                                        style='CardSub.TLabel')
+    def _build_play_view(self, view):
+        """문제 화면: 진행 막대, 문제, 답 입력칸."""
+        self.progress_label = ttk.Label(view, text='', style='CardSub.TLabel')
         self.progress_label.pack()
-        self.progress = ttk.Progressbar(board, length=self.px(420), maximum=1,
+        self.progress = ttk.Progressbar(view, length=self.px(420), maximum=1,
                                         style='Quiz.Horizontal.TProgressbar')
         self.progress.pack(pady=(8, 0))
 
-        self.question_label = tk.Label(board, text='VocaQuiz', bg=WHITE,
-                                       fg=NAVY, font=(FONT, 34, 'bold'))
-        self.question_label.pack(pady=(14, 12))
+        self.question_label = tk.Label(view, text='', bg=WHITE, fg=NAVY,
+                                       font=(FONT, 34, 'bold'))
+        self.question_label.pack(pady=(18, 14))
 
-        answer_row = ttk.Frame(board, style='Card.TFrame')
+        answer_row = ttk.Frame(view, style='Card.TFrame')
         answer_row.pack()
         self.answer_entry = ttk.Entry(answer_row, width=26, font=(FONT, 15),
-                                      justify='center', state='disabled')
+                                      justify='center')
         self.answer_entry.pack(side='left', ipady=4)
         self.answer_entry.bind('<Return>', lambda event: self.submit_answer())
-        self.submit_button = ttk.Button(answer_row, text='제출',
-                                        style='Accent.TButton',
-                                        command=self.submit_answer,
-                                        state='disabled')
-        self.submit_button.pack(side='left', padx=(8, 0), ipady=3)
+        self._button(answer_row, '제출', self.submit_answer,
+                     kind='primary').pack(side='left', padx=(8, 0))
 
-        self.feedback_label = tk.Label(board, text='', bg=WHITE,
+        self.feedback_label = tk.Label(view, text='', bg=WHITE,
                                        font=(FONT, 13, 'bold'))
-        self.feedback_label.pack(pady=(14, 0))
-        self.score_label = ttk.Label(board, text='Enter 키로도 제출할 수 있어요',
-                                     style='CardSub.TLabel')
+        self.feedback_label.pack(pady=(16, 0))
+        self.score_label = ttk.Label(view, text='', style='CardSub.TLabel')
         self.score_label.pack(pady=(4, 0))
+        self._button(view, '그만두기', self.quit_quiz).pack(pady=(20, 0))
+
+    def _build_result_view(self, view):
+        """결과 화면: 점수와 다음 행동 버튼."""
+        self.result_title = ttk.Label(view, text='', style='CardSub.TLabel')
+        self.result_title.pack()
+        self.result_score = tk.Label(view, text='', bg=WHITE,
+                                     font=(FONT, 44, 'bold'))
+        self.result_score.pack(pady=(6, 0))
+        self.result_detail = tk.Label(view, text='', bg=WHITE, fg=NAVY,
+                                      font=(FONT, 12))
+        self.result_detail.pack(pady=(4, 0))
+        self.result_last = tk.Label(view, text='', bg=WHITE,
+                                    font=(FONT, 11))
+        self.result_last.pack(pady=(14, 0))
+
+        buttons = ttk.Frame(view, style='Card.TFrame')
+        buttons.pack(pady=(24, 0))
+        self._button(buttons, '다시 풀기', self.retry_quiz,
+                     kind='primary').pack(side='left')
+        self._button(buttons, '오답노트 풀기',
+                     self.start_wrong_quiz).pack(side='left', padx=10)
+        self._button(buttons, '처음으로', self.go_start).pack(side='left')
+
+    def go_start(self):
+        """시작 화면으로 돌아간다."""
+        wrong = file_io.load_words(file_io.WRONG_PATH, notify=False)
+        self.wrong_count_label.config(text=f'오답노트에 단어 {len(wrong)}개')
+        self.show_view(self.start_view)
 
     def start_quiz(self):
         """고른 단어장(또는 전체)으로 퀴즈를 시작한다."""
@@ -466,8 +502,21 @@ class VocaApp(tk.Tk):
         self.quiz_title = '오답노트'
         self._begin(wrong, len(wrong), is_wrong=True)
 
+    def retry_quiz(self):
+        """방금 푼 것과 같은 종류의 퀴즈를 다시 시작한다."""
+        if self.is_wrong_quiz:
+            self.start_wrong_quiz()
+        else:
+            self.start_quiz()
+
+    def quit_quiz(self):
+        """푸는 중인 퀴즈를 기록 없이 끝내고 시작 화면으로 돌아간다."""
+        if messagebox.askyesno('그만두기', '퀴즈를 그만둘까요?\n(점수는 기록되지 않아요)'):
+            self.items = []
+            self.go_start()
+
     def _begin(self, words, n, is_wrong):
-        """퀴즈 상태를 초기화하고 첫 문제를 보여준다."""
+        """퀴즈 상태를 초기화하고 문제 화면으로 바꾼다."""
         self.mode = self.mode_var.get()
         try:
             self.items = quiz.make_quiz(words, n, self.mode)
@@ -478,13 +527,9 @@ class VocaApp(tk.Tk):
         self.index = 0
         self.is_wrong_quiz = is_wrong
 
-        self.start_button.config(state='disabled')
-        self.wrong_button.config(state='disabled')
-        self.answer_entry.config(state='normal')
-        self.submit_button.config(state='normal')
         self.progress.config(maximum=len(self.items), value=0)
         self.feedback_label.config(text='')
-        self.question_label.config(fg=NAVY)
+        self.show_view(self.play_view)
         self.show_question()
 
     def show_question(self):
@@ -498,7 +543,8 @@ class VocaApp(tk.Tk):
         self.answer_entry.delete(0, 'end')
         self.answer_entry.focus()
         correct, _ = quiz.get_score(self.results)
-        self.score_label.config(text=f'현재 점수 {correct} / {self.index}')
+        self.score_label.config(
+            text=f'현재 점수 {correct} / {self.index}   ·   Enter 키로 제출')
 
     def submit_answer(self):
         """답을 채점하고 다음 문제로 넘어간다."""
@@ -523,7 +569,7 @@ class VocaApp(tk.Tk):
             self.finish_quiz()
 
     def finish_quiz(self):
-        """점수를 기록하고 오답노트를 갱신한다."""
+        """점수를 기록하고 오답노트를 갱신한 뒤 결과 화면을 보여준다."""
         correct, total = quiz.get_score(self.results)
         date = time.strftime('%Y-%m-%d %H:%M')
         kind = f'{self.quiz_title} · {MODE_NAMES[self.mode]}'
@@ -542,16 +588,14 @@ class VocaApp(tk.Tk):
             extra = f'오답노트에 {len(new_wrong)}개 저장'
 
         rate = correct / total * 100
-        self.progress.config(value=total)
-        self.progress_label.config(text=f'{kind}   퀴즈 종료')
-        self.question_label.config(text=f'{correct} / {total}',
-                                   fg=BLUE if rate >= 70 else ORANGE_DARK)
-        self.score_label.config(text=f'정답률 {rate:.0f}%  ·  {extra}')
-        self.answer_entry.delete(0, 'end')
-        self.answer_entry.config(state='disabled')
-        self.submit_button.config(state='disabled')
-        self.start_button.config(state='normal')
-        self.wrong_button.config(state='normal')
+        self.items = []
+        self.result_title.config(text=f'{kind}   퀴즈 결과')
+        self.result_score.config(text=f'{correct} / {total}',
+                                 fg=BLUE if rate >= 70 else ORANGE_DARK)
+        self.result_detail.config(text=f'정답률 {rate:.0f}%   ·   {extra}')
+        self.result_last.config(text='마지막 문제  ' + self.feedback_label['text'],
+                                fg=self.feedback_label['fg'])
+        self.show_view(self.result_view)
         self.refresh_records()
         self.refresh_header()
 
@@ -561,8 +605,9 @@ class VocaApp(tk.Tk):
         """요약 카드와 학습 기록 표를 만든다."""
         tab = self.record_tab
 
-        summary = self._card(tab, padding=14)
-        summary.pack(fill='x', pady=(0, 12))
+        summary_card = self._card(tab, padding=14)
+        summary_card.pack(fill='x', pady=(0, 12))
+        summary = summary_card.inner
         self.summary_labels = []
         for title in ('푼 횟수', '평균 정답률', '최고 점수'):
             box = ttk.Frame(summary, style='Card.TFrame')
@@ -573,8 +618,9 @@ class VocaApp(tk.Tk):
             value.pack()
             self.summary_labels.append(value)
 
-        table_frame = ttk.Frame(tab)
-        table_frame.pack(fill='both', expand=True)
+        table_card = self._card(tab, padding=8)
+        table_card.pack(fill='both', expand=True)
+        table_frame = table_card.inner
         columns = ('date', 'kind', 'score', 'rate')
         self.record_tree = ttk.Treeview(table_frame, columns=columns,
                                         show='headings', height=10)
